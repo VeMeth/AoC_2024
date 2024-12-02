@@ -21,16 +21,16 @@ fn main() {
     
     // Bruteforce
     for (i, sequence) in all_sequences.iter().enumerate() {
-        println!("\nAnalyzing Sequence {}: {:?}", i, sequence);
+        //println!("\nAnalyzing Sequence {}: {:?}", i, sequence);
         
         if sequence.len() < 2 {
-            println!("Sequence too short to analyze");
+            //println!("Sequence too short to analyze");
             continue;
         }
 
         // Try the original sequence first
         if is_valid_sequence(sequence) {
-            println!("Original sequence is valid");
+            //println!("Original sequence is valid");
             hits += 1;
             continue;
         }
@@ -38,15 +38,10 @@ fn main() {
         // Try removing each value one at a time
         let mut found_valid = false;
         for skip_index in 0..sequence.len() {
-            let modified_sequence: Vec<i32> = sequence
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| *i != skip_index)
-                .map(|(_, &x)| x)
-                .collect();
+            let modified_sequence: Vec<i32> = [&sequence[..skip_index], &sequence[skip_index + 1..]].concat();
 
             if modified_sequence.len() >= 2 && is_valid_sequence(&modified_sequence) {
-                println!("Found valid sequence by removing index {}: {:?}", skip_index, modified_sequence);
+                //println!("Found valid sequence by removing index {}: {:?}", skip_index, modified_sequence);
                 hits += 1;
                 found_valid = true;
                 break;
@@ -54,7 +49,7 @@ fn main() {
         }
 
         if !found_valid {
-            println!("Could not find a valid sequence by removing one number");
+            //println!("Could not find a valid sequence by removing one number");
         }
     }
 
