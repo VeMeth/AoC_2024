@@ -14,11 +14,11 @@ dockerfile: Dockerfile
 # Location where code directory should be mounted
 code: /code
 # [*] What directory to run code from
-workdir: /code
+workdir: /code/day%day%
 # [*] When running image, command to run a given day.
 cmd: "./target/release/day%day%"
 # [*] When running image, command to run once to build a given day if needed.
-runonce: "cargo build --manifest-path=day%day%/Cargo.toml --release"
+runonce: "cargo build --release"
 # [*] Directories that need persisting across runs
 persistence:
  - /usr/local/cargo/registry
