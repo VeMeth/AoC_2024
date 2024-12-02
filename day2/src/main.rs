@@ -16,67 +16,89 @@ fn main() {
             }
         }
     }
-    let mut hits = 0;   
-    // Process each sequence
-    for (_i, sequence) in all_sequences.iter().enumerate() {
-        //println!("\nAnalyzing Sequence {}: {:?}", i, sequence);
+    
+    let mut hits = 0;
+    
+    // Bruteforce
+    for (i, sequence) in all_sequences.iter().enumerate() {
+        println!("\nAnalyzing Sequence {}: {:?}", i, sequence);
         
         if sequence.len() < 2 {
-            //println!("Sequence too short to analyze");
+            println!("Sequence too short to analyze");
             continue;
         }
 
-        let mut is_valid = true;
-        let mut prev_value = sequence[0];
-        let mut direction_set = false;
-        let mut is_decreasing = false;
-
-        // Check each pair of numbers in the sequence
-        for window in sequence.windows(2) {
-            let curr_value = window[1];
-            let difference = curr_value - prev_value;
-
-            // Check if difference is zero
-            if difference == 0 {
-                //println!("No change between values: {} to {}", prev_value, curr_value);
-                is_valid = false;
-                break;
-            }
-
-            // Check if values are within range (1-3)
-            if difference.abs() >= 4 || difference.abs() < 1 {
-                //println!("Invalid change between {} to {}: difference = {}", 
-                //    prev_value, curr_value, difference);
-                is_valid = false;
-                break;
-            }
-
-            // Set or verify direction
-            if !direction_set {
-                is_decreasing = difference < 0;
-                direction_set = true;
-                //println!("Direction set to {}", if is_decreasing { "decreasing" } else { "increasing" });
-            } else {
-                let current_decreasing = difference < 0;
-                if current_decreasing != is_decreasing {
-                    //println!("Direction changed: {} to {}", prev_value, curr_value);
-                    is_valid = false;
-                    break;
-                }
-            }
-
-            prev_value = curr_value;
+        // Try the original sequence first
+        if is_valid_sequence(sequence) {
+            println!("Original sequence is valid");
+            hits += 1;
+            continue;
         }
 
-        if is_valid {
-            //println!("Valid sequence: maintains direction and changes by 1-3 units");
-            hits += 1;
-        } else {
-            //println!("Invalid sequence: violates direction or change constraints");
+        // Try removing each value one at a time
+        let mut found_valid = false;
+        for skip_index in 0..sequence.len() {
+            let modified_sequence: Vec<i32> = sequence
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != skip_index)
+                .map(|(_, &x)| x)
+                .collect();
+
+            if modified_sequence.len() >= 2 && is_valid_sequence(&modified_sequence) {
+                println!("Found valid sequence by removing index {}: {:?}", skip_index, modified_sequence);
+                hits += 1;
+                found_valid = true;
+                break;
+            }
+        }
+
+        if !found_valid {
+            println!("Could not find a valid sequence by removing one number");
         }
     }
 
-    println!("\nNumber of valid sequences: {}", hits);
+    println!("\nNumber of valid sequences (including fixed ones): {}", hits);
+}
+
+fn is_valid_sequence(sequence: &[i32]) -> bool {
+    if sequence.len() < 2 {
+        return false;
+    }
+
+    let mut prev_value = sequence[0];
+    let mut direction_set = false;
+    let mut is_decreasing = false;
+
+    for window in sequence.windows(2) {
+        let curr_value = window[1];
+        let difference = curr_value - prev_value;
+
+        // min +1
+        if difference == 0 {
+            return false;
+        }
+
+        // range
+        if difference.abs() >= 4 || difference.abs() < 1 {
+            return false;
+        }
+
+        // direction
+        if !direction_set {
+            is_decreasing = difference < 0;
+            direction_set = true;
+        } else {
+            let current_decreasing = difference < 0;
+            if current_decreasing != is_decreasing {
+                return false;
+            }
+        }
+
+        prev_value = curr_value;
+    }
+
+    true
 }
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
