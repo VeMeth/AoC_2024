@@ -18,7 +18,7 @@ workdir: /code
 # [*] When running image, command to run a given day.
 cmd: "./target/release/day%zeroday%"
 # [*] When running image, command to run once to build a given day if needed.
-runonce: "cargo build --release --bin day%zeroday%"
+runonce: "cargo build --manifest-path=day%zeroday%/Cargo.toml --release"
 # [*] Directories that need persisting across runs
 persistence:
  - /usr/local/cargo/registry

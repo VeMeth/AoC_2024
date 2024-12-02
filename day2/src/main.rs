@@ -5,7 +5,7 @@ use std::path::Path;
 fn main() {
     // Read sequences from file
     let mut all_sequences: Vec<Vec<i32>> = Vec::new();
-    if let Ok(lines) = read_lines("input.txt") {
+    if let Ok(lines) = read_lines("data/input.txt") {
         for line in lines {
             if let Ok(ip) = line {
                 let numbers: Vec<i32> = ip
