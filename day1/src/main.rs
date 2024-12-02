@@ -51,7 +51,7 @@ fn main() -> io::Result<()> {
     fs::create_dir_all("data")?;
     
     // Write results to file
-    write_results(score, distance)?;
+    write_results(distance, score)?;
     
     Ok(())
 }
@@ -64,9 +64,9 @@ where P: AsRef<Path>, {
 }
 
 // Write results to file
-fn write_results(score: i32, distance: i32) -> io::Result<()> {
+fn write_results(distance: i32, score: i32) -> io::Result<()> {
     let mut file = File::create("data/answer.txt")?;
-    writeln!(file, "{}", score)?;
     writeln!(file, "{}", distance)?;
+    writeln!(file, "{}", score)?;
     Ok(())
 }
