@@ -1,6 +1,7 @@
 use std::fs::File;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::path::Path;
+use std::fs::create_dir_all;
 
 fn main() {
     // Read sequences from file
@@ -18,7 +19,7 @@ fn main() {
     }
     
     let mut hits = 0;
-    
+    let mut truehits = 0;
     // Bruteforce
     for (i, sequence) in all_sequences.iter().enumerate() {
         //println!("\nAnalyzing Sequence {}: {:?}", i, sequence);
@@ -32,6 +33,7 @@ fn main() {
         if is_valid_sequence(sequence) {
             //println!("Original sequence is valid");
             hits += 1;
+            truehits += 1;
             continue;
         }
 
@@ -52,8 +54,27 @@ fn main() {
             //println!("Could not find a valid sequence by removing one number");
         }
     }
-
+    println!("\nNumber of valid sequences: {}", truehits);
     println!("\nNumber of valid sequences (including fixed ones): {}", hits);
+    
+    // Write result to file
+    if let Err(e) = write_result(truehits, hits) {
+        eprintln!("Error writing result to file: {}", e);
+    }
+}
+
+fn write_result(truehits: i32, hits: i32) -> io::Result<()> {
+    // Create the data directory if it doesn't exist
+    create_dir_all("data")?;
+    
+    // Open file with write permissions
+    let mut file = File::create("data/answer.txt")?;
+    
+    // Write truehits first, then hits, separated by a newline
+    writeln!(file, "{}", truehits)?;
+    write!(file, "{}", hits)?;
+    
+    Ok(())
 }
 
 fn is_valid_sequence(sequence: &[i32]) -> bool {
