@@ -26,7 +26,7 @@ persistence:
 # [*] Environment vars to set on container
 environment: []
 # [*] Path to per-day code.
-daypath: "src/day%zeroday%/main.rs"
+daypath: "day%zeroday%/src/main.rs"
 # [*] Path to per-day input file.
 inputfile: "day%zeroday%/data/input.txt"
 # [*] Path to per-day answer file.
