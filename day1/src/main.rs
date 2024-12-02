@@ -1,7 +1,6 @@
 use std::fs::File;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead};
 use std::path::Path;
-use std::fs;
 
 fn main() -> io::Result<()> {
     let mut left_numbers: Vec<i32> = Vec::new();
@@ -44,14 +43,9 @@ fn main() -> io::Result<()> {
         score = score + sim;
     }
 
-    println!("Total Score is: {}", score);
-    println!("The Distance is: {}", distance);
-
-    // Create data directory if it doesn't exist
-    fs::create_dir_all("data")?;
     
-    // Write results to file
-    write_results(distance, score)?;
+    println!("The Distance is: {}", distance);
+    println!("Total Score is: {}", score);
     
     Ok(())
 }
@@ -61,12 +55,4 @@ fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where P: AsRef<Path>, {
     let file = File::open(filename)?;
     Ok(io::BufReader::new(file).lines())
-}
-
-// Write results to file
-fn write_results(distance: i32, score: i32) -> io::Result<()> {
-    let mut file = File::create("data/answer.txt")?;
-    writeln!(file, "{}", distance)?;
-    writeln!(file, "{}", score)?;
-    Ok(())
 }
