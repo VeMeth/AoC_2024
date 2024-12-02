@@ -25,11 +25,13 @@ fn main() -> io::Result<()> {
     // Sort Arrayy
     left_numbers.sort();
     right_numbers.sort();
+    // Part 1
     let mut distance = 0;
     for (left, right) in left_numbers.iter().zip(right_numbers.iter()) {
         let diff = left - right; 
         distance = distance + diff.abs();
     }
+    //Part 2
     let mut score = 0;
     for left in left_numbers.iter() {
         let count = right_numbers.iter()
