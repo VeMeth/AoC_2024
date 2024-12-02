@@ -11,6 +11,14 @@
             "program": "${workspaceFolder}/<executable file>",
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Linuz",
+            "program": "${workspaceFolder}/day1/task_1/target/debug/Task_1",
+            "args": [],
+            "cwd": "${workspaceFolder}/day1/task_1"
         }
     ]
 }
