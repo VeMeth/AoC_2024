@@ -6,9 +6,9 @@ author: VeMeth
 # Language used
 language: Rust
 # Path to Dockerfile to build image
-dockerfile: Dockerfile
+#dockerfile: Dockerfile
 # Or image (this takes priority)
-# image: rust:alpine
+image: rust:alpine
 # Disable Hyperfine usage
 # hyperfine: False
 # Location where code directory should be mounted
