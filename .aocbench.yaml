@@ -16,9 +16,9 @@ code: /code
 # [*] What directory to run code from
 workdir: /code
 # [*] When running image, command to run a given day.
-cmd: "./target/release/day%zeroday%"
+cmd: "./target/release/day%day%"
 # [*] When running image, command to run once to build a given day if needed.
-runonce: "cargo build --manifest-path=day%zeroday%/Cargo.toml --release"
+runonce: "cargo build --manifest-path=day%day%/Cargo.toml --release"
 # [*] Directories that need persisting across runs
 persistence:
  - /usr/local/cargo/registry
@@ -26,8 +26,8 @@ persistence:
 # [*] Environment vars to set on container
 environment: []
 # [*] Path to per-day code.
-daypath: "day%zeroday%/src/main.rs"
+daypath: "day%day%/src/main.rs"
 # [*] Path to per-day input file.
-inputfile: "day%zeroday%/data/input.txt"
+inputfile: "day%day%/data/input.txt"
 # [*] Path to per-day answer file.
-answerfile: "day%zeroday%/data/answer.txt"
+answerfile: "day%day%/data/answer.txt"
