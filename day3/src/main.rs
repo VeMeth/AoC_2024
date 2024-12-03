@@ -1,6 +1,6 @@
 use std::fs::read_to_string;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Multiplication {
     num1: i32,
     num2: i32,
@@ -8,37 +8,45 @@ struct Multiplication {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let content = read_to_string("data/input.txt")?;
-    let multiplications = parse_multiplications(&content);
+    let (multiplications, precise_multiplications) = parse_multiplications(&content);
     
-    //println!("Found {} valid multiplications", multiplications.len());
-
-    let mut sum = 0;
-    for mult in multiplications.iter() {
-        //println!("{}x{}", mult.num1, mult.num2);
-        sum = sum + mult.num1 * mult.num2;
-    }
+    let sum: i32 = multiplications.iter().map(|m| m.num1 * m.num2).sum();
+    let precise_sum: i32 = precise_multiplications.iter().map(|m| m.num1 * m.num2).sum();
     
-    println!("Total Sum of Multiplications: {}", sum);
+    println!("Total Sum: {}", sum);
+    println!("Precise Sum: {}", precise_sum);
     Ok(())
 }
 
-fn parse_multiplications(input: &str) -> Vec<Multiplication> {
+fn parse_multiplications(input: &str) -> (Vec<Multiplication>, Vec<Multiplication>) {
     let mut result = Vec::new();
+    let mut precise_result = Vec::new();
+    let mut do_flag = true;
     
-    for part in input.split("mul(").skip(1) {
-        if let Some(end) = part.find(')') {
-            let numbers: Vec<&str> = part[..end].split(',').collect();
+    let controls: Vec<(usize, bool)> = input.match_indices("don't()")
+        .map(|(pos, _)| (pos, false))
+        .chain(input.match_indices("do()").map(|(pos, _)| (pos, true)))
+        .collect();
+    
+    for (pos, _) in input.match_indices("mul(") {
+        if let Some(end) = input[pos..].find(')') {
+            let nums: Vec<&str> = input[pos+4..pos+end].split(',').collect();
+            if nums.len() != 2 { continue; }
             
-            if numbers.len() == 2 {
-                if let (Ok(num1), Ok(num2)) = (
-                    numbers[0].trim().parse::<i32>(),
-                    numbers[1].trim().parse::<i32>()
-                ) {
-                    result.push(Multiplication { num1, num2 });
+            do_flag = controls.iter()
+                .filter(|(control_pos, _)| control_pos < &pos)
+                .max_by_key(|&(pos, _)| pos)
+                .map_or(true, |&(_, flag)| flag);
+            
+            if let (Ok(num1), Ok(num2)) = (nums[0].trim().parse(), nums[1].trim().parse()) {
+                let mult = Multiplication { num1, num2 };
+                result.push(mult.clone());
+                if do_flag {
+                    precise_result.push(mult);
                 }
             }
         }
     }
     
-    result
+    (result, precise_result)
 }
