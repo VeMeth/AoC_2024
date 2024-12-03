@@ -22,7 +22,6 @@ fn parse_multiplications(input: &str) -> (Vec<Multiplication>, Vec<Multiplicatio
     let mut result = Vec::new();
     let mut precise_result = Vec::new();
     let mut do_flag = true;
-    
     let controls: Vec<(usize, bool)> = input.match_indices("don't()")
         .map(|(pos, _)| (pos, false))
         .chain(input.match_indices("do()").map(|(pos, _)| (pos, true)))
