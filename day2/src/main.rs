@@ -5,7 +5,7 @@ use std::path::Path;
 fn main() {
     // Read sequences from file
     let mut all_sequences: Vec<Vec<i32>> = Vec::new();
-    if let Ok(lines) = read_lines("input.txt") {
+    if let Ok(lines) = read_lines("data/input.txt") {
         for line in lines {
             if let Ok(ip) = line {
                 let numbers: Vec<i32> = ip
@@ -18,7 +18,7 @@ fn main() {
     }
     
     let mut hits = 0;
-    
+    let mut truehits = 0;
     // Bruteforce
     for (i, sequence) in all_sequences.iter().enumerate() {
         //println!("\nAnalyzing Sequence {}: {:?}", i, sequence);
@@ -32,6 +32,7 @@ fn main() {
         if is_valid_sequence(sequence) {
             //println!("Original sequence is valid");
             hits += 1;
+            truehits += 1;
             continue;
         }
 
@@ -52,9 +53,13 @@ fn main() {
             //println!("Could not find a valid sequence by removing one number");
         }
     }
-
+    println!("\nNumber of valid sequences: {}", truehits);
     println!("\nNumber of valid sequences (including fixed ones): {}", hits);
+    
+
 }
+
+
 
 fn is_valid_sequence(sequence: &[i32]) -> bool {
     if sequence.len() < 2 {
