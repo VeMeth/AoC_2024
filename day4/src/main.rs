@@ -1,8 +1,6 @@
-use std::fmt;
 use std::fs::read_to_string;
 use std::error::Error;
 
-#[derive(Debug)]
 struct Grid {
     cells: Vec<Vec<char>>,
     rows: usize,
@@ -20,53 +18,85 @@ impl Grid {
         let rows = cells.len();
         let cols = if rows > 0 { cells[0].len() } else { 0 };
 
+        if !cells.iter().all(|row| row.len() == cols) {
+            return Err("Inconsistent row lengths".into());
+        }
+
         Ok(Grid { cells, rows, cols })
     }
 
     const DIRECTIONS: [(i32, i32); 8] = [
-        (0, 1),   // right
-        (1, 1),   // down-right
-        (1, 0),   // down
-        (1, -1),  // down-left
-        (0, -1),  // left
-        (-1, -1), // up-left
-        (-1, 0),  // up
-        (-1, 1),  // up-right
+        (0, 1), (1, 1), (1, 0), (1, -1),
+        (0, -1), (-1, -1), (-1, 0), (-1, 1),
     ];
 
-    fn find_word(&self, word: &str) -> Vec<(usize, usize, &'static str)> {
-        let mut results = Vec::new();
+    fn count_word(&self, word: &str) -> usize {
         let word_chars: Vec<char> = word.chars().collect();
+        let mut count = 0;
 
         for row in 0..self.rows {
             for col in 0..self.cols {
-                for (direction_idx, &(dx, dy)) in Self::DIRECTIONS.iter().enumerate() {
+                for &(dx, dy) in Self::DIRECTIONS.iter() {
                     if self.check_word_from_position(row, col, &word_chars, dx, dy) {
-                        let direction_name = match direction_idx {
-                            0 => "right",
-                            1 => "down-right",
-                            2 => "down",
-                            3 => "down-left",
-                            4 => "left",
-                            5 => "up-left",
-                            6 => "up",
-                            7 => "up-right",
-                            _ => unreachable!(),
-                        };
-                        results.push((row, col, direction_name));
+                        count += 1;
                     }
                 }
             }
         }
-        results
+        count
+    }
+
+    fn count_cross_pattern(&self) -> usize {
+        let mut count = 0;
+
+        // Pattern needs at least 3x3 space
+        for row in 1..self.rows.saturating_sub(1) {
+            for col in 1..self.cols.saturating_sub(1) {
+                if self.check_cross_at_position(row, col, false) ||
+                   self.check_cross_at_position(row, col, true) {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+
+    fn check_cross_at_position(&self, row: usize, col: usize, reversed: bool) -> bool {
+        // First, check center A
+        if self.cells[row][col] != 'A' {
+            return false;
+        }
+    
+        // Get the diagonal lines
+        let forward_diagonal = [
+            self.cells[row-1][col+1],  // top-right
+            self.cells[row][col],      // center
+            self.cells[row+1][col-1]   // bottom-left
+        ];
+    
+        let back_diagonal = [
+            self.cells[row-1][col-1],  // top-left
+            self.cells[row][col],      // center
+            self.cells[row+1][col+1]   // bottom-right
+        ];
+    
+        // Define the patterns we're looking for
+        let pattern1 = ['M', 'A', 'S'];
+        let pattern2 = ['S', 'A', 'M'];
+    
+        // Check if either diagonal matches either pattern
+        let forward_matches = forward_diagonal == pattern1 || forward_diagonal == pattern2;
+        let back_matches = back_diagonal == pattern1 || back_diagonal == pattern2;
+    
+        // Both diagonals must match a pattern
+        forward_matches && back_matches
     }
 
     fn check_word_from_position(&self, row: usize, col: usize, word: &[char], dx: i32, dy: i32) -> bool {
         let word_len = word.len();
-        
         let end_row = row as i32 + dx * (word_len as i32 - 1);
         let end_col = col as i32 + dy * (word_len as i32 - 1);
-        
+
         if end_row < 0 || end_row >= self.rows as i32 || end_col < 0 || end_col >= self.cols as i32 {
             return false;
         }
@@ -74,7 +104,7 @@ impl Grid {
         for i in 0..word_len {
             let curr_row = (row as i32 + dx * i as i32) as usize;
             let curr_col = (col as i32 + dy * i as i32) as usize;
-            
+
             if self.cells[curr_row][curr_col] != word[i] {
                 return false;
             }
@@ -83,37 +113,15 @@ impl Grid {
     }
 }
 
-impl fmt::Display for Grid {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for row in &self.cells {
-            for &cell in row {
-                write!(f, "{} ", cell)?;
-            }
-            writeln!(f)?;
-        }
-        Ok(())
-    }
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     let grid = Grid::from_file("data/input.txt")?;
 
-    println!("Grid:");
-    println!("{}", grid);
-
     let word = "XMAS";
-    let results = grid.find_word(word);
-    let count = results.len();
-    
-    if results.is_empty() {
-        println!("\nWord '{}' not found in the grid.", word);
-    } else {
-        println!("\nFound {} occurrences of '{}':", count, word);
-        for (row, col, direction) in results {
-            println!("({}, {}) going {}", row, col, direction);
-        }
-        println!("\nTotal combinations found: {}", count);
-    }
+    let word_count = grid.count_word(word);
+    println!("Found {} occurrences of '{}'", word_count, word);
+
+    let cross_count = grid.count_cross_pattern();
+    println!("Found {} cross patterns", cross_count);
 
     Ok(())
 }
