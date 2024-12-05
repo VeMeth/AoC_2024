@@ -3,9 +3,7 @@ use std::io::{self, BufRead};
 use std::path::Path;
 use std::collections::{HashMap, HashSet};
 use log::{info, warn};
-use petgraph::Graph;
-use petgraph::algo::toposort;
-
+use rayon::prelude::*;
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -14,21 +12,43 @@ fn main() -> io::Result<()> {
     let file = File::open(path)?;
     let reader = io::BufReader::new(file);
     
+    // Pre-allocate with capacity hints
     let mut rules: HashMap<i32, Vec<i32>> = HashMap::with_capacity(100);
     let mut updates: Vec<Vec<i32>> = Vec::with_capacity(1000);
     
+    // Single-pass file reading with more efficient parsing
     for line in reader.lines() {
         let line = line?;
         
-        if let Some((key_str, value_str)) = line.split_once('|') {
-            if let (Ok(key), Ok(value)) = (key_str.trim().parse(), value_str.trim().parse()) {
-                rules.entry(key).or_insert_with(|| Vec::with_capacity(5)).push(value);
+        if let Some(pipe_idx) = line.find('|') {
+            // Avoid allocation of temporary strings
+            let (key_str, value_str) = line.split_at(pipe_idx);
+            if let (Ok(key), Ok(value)) = (
+                key_str.trim().parse(),
+                value_str[1..].trim().parse()
+            ) {
+                rules.entry(key)
+                    .or_insert_with(|| Vec::with_capacity(5))
+                    .push(value);
             }
         } else if !line.is_empty() {
-            let numbers: Vec<i32> = line
-                .split(',')
-                .filter_map(|n| n.trim().parse().ok())
-                .collect();
+            // More efficient number parsing
+            let mut numbers = Vec::with_capacity(10);
+            let mut num_start = 0;
+            
+            for (i, c) in line.chars().enumerate() {
+                if c == ',' {
+                    if let Ok(num) = line[num_start..i].trim().parse() {
+                        numbers.push(num);
+                    }
+                    num_start = i + 1;
+                }
+            }
+            // Handle last number
+            if let Ok(num) = line[num_start..].trim().parse() {
+                numbers.push(num);
+            }
+            
             if !numbers.is_empty() {
                 updates.push(numbers);
             }
@@ -36,53 +56,66 @@ fn main() -> io::Result<()> {
     }
     
     info!("Input summary - Rules: {}, Sequences: {}", rules.len(), updates.len());
-    process_sequences(&rules, &updates);
+    
+    // Build graph once
+    let graph = build_dependency_graph(&rules);
+    process_sequences(&rules, &updates, &graph);
     Ok(())
 }
 
-fn process_sequences(rules: &HashMap<i32, Vec<i32>>, updates: &[Vec<i32>]) {
-    let mut valid_sum = 0;
-    let mut reordered_sum = 0;
-    
-    let graph = build_dependency_graph(rules);
-    
-    for (line_index, update) in updates.iter().enumerate() {
-        let (is_valid, violations) = check_sequence(rules, update);
-        
-        if is_valid {
-            if let Some(&middle) = update.get(update.len() / 2) {
-                valid_sum += middle;
-            }
-        } else {
-            warn!("Invalid sequence {} with {} violations", line_index + 1, violations.len());
+fn process_sequences(
+    rules: &HashMap<i32, Vec<i32>>,
+    updates: &[Vec<i32>],
+    graph: &HashMap<i32, HashSet<i32>>
+) {
+    // Use parallel iterator for processing sequences
+    let results: Vec<_> = updates.par_iter()
+        .map(|update| {
+            let (is_valid, violations) = check_sequence(rules, update);
             
-            if let Some(ordered) = attempt_reordering(rules, update) {
-                if let Some(&middle) = ordered.get(ordered.len() / 2) {
-                    reordered_sum += middle;
-                }
+            if is_valid {
+                update.get(update.len() / 2).copied()
+            } else {
+                warn!("Invalid sequence with {} violations", violations.len());
+                attempt_reordering(rules, update, graph)
+                    .and_then(|ordered| ordered.get(ordered.len() / 2).copied())
             }
-        }
-    }
+        })
+        .collect();
+    
+    // Calculate sums
+    let (valid_sum, reordered_sum) = results.iter()
+        .fold((0, 0), |(valid, reorder), &result| {
+            match result {
+                Some(val) => (valid + val, reorder),
+                None => (valid, reorder)
+            }
+        });
     
     println!("Valid sequences sum: {}", valid_sum);
     println!("Reordered sequences sum: {}", reordered_sum);
 }
 
-#[inline]
+#[inline(always)]
 fn check_sequence(rules: &HashMap<i32, Vec<i32>>, sequence: &[i32]) -> (bool, Vec<(i32, i32, usize, usize)>) {
     let mut violations = Vec::new();
     
-    let positions: HashMap<i32, usize> = sequence.iter()
-        .enumerate()
-        .map(|(i, &val)| (val, i))
-        .collect();
+    // Use a fixed-size array for position lookup if possible
+    let mut positions = [usize::MAX; 10000];
+    for (i, &val) in sequence.iter().enumerate() {
+        positions[val as usize] = i;
+    }
     
-    for (&from, to_list) in rules {
-        if let Some(&from_pos) = positions.get(&from) {
+    'outer: for (&from, to_list) in rules {
+        let from_pos = positions[from as usize];
+        if from_pos != usize::MAX {
             for &to in to_list {
-                if let Some(&to_pos) = positions.get(&to) {
-                    if from_pos > to_pos {
-                        violations.push((from, to, from_pos, to_pos));
+                let to_pos = positions[to as usize];
+                if to_pos != usize::MAX && from_pos > to_pos {
+                    violations.push((from, to, from_pos, to_pos));
+                    // Early exit if we only need to know if it's valid
+                    if violations.len() == 1 {
+                        break 'outer;
                     }
                 }
             }
@@ -92,42 +125,69 @@ fn check_sequence(rules: &HashMap<i32, Vec<i32>>, sequence: &[i32]) -> (bool, Ve
     (violations.is_empty(), violations)
 }
 
-fn build_dependency_graph(rules: &HashMap<i32, Vec<i32>>) -> HashMap<i32, HashSet<i32>> {
-    let mut graph: HashMap<i32, HashSet<i32>> = HashMap::new();
-    for (&from, to_list) in rules {
-        graph.entry(from)
-            .or_insert_with(HashSet::new)
-            .extend(to_list.iter().copied());
-    }
-    graph
-}
-
-fn attempt_reordering(rules: &HashMap<i32, Vec<i32>>, sequence: &[i32]) -> Option<Vec<i32>> {
-    let mut graph = Graph::<i32, ()>::new();
-    let mut node_indices = HashMap::new();
+fn attempt_reordering(
+    rules: &HashMap<i32, Vec<i32>>,
+    sequence: &[i32],
+    graph: &HashMap<i32, HashSet<i32>>
+) -> Option<Vec<i32>> {
+    let mut ordered = Vec::with_capacity(sequence.len());
+    let mut visited = HashSet::with_capacity(sequence.len());
+    let mut temp_visited = HashSet::new();
     
-    // Create nodes
-    for &num in sequence {
-        let idx = graph.add_node(num);
-        node_indices.insert(num, idx);
-    }
-    
-    // Add edges
-    for (&from, to_list) in rules {
-        if let Some(&from_idx) = node_indices.get(&from) {
-            for &to in to_list {
-                if let Some(&to_idx) = node_indices.get(&to) {
-                    graph.add_edge(from_idx, to_idx, ());
+    // Custom topological sort implementation
+    fn visit(
+        node: i32,
+        graph: &HashMap<i32, HashSet<i32>>,
+        visited: &mut HashSet<i32>,
+        temp_visited: &mut HashSet<i32>,
+        ordered: &mut Vec<i32>
+    ) -> bool {
+        if temp_visited.contains(&node) {
+            return false;
+        }
+        if visited.contains(&node) {
+            return true;
+        }
+        
+        temp_visited.insert(node);
+        
+        if let Some(neighbors) = graph.get(&node) {
+            for &neighbor in neighbors {
+                if !visit(neighbor, graph, visited, temp_visited, ordered) {
+                    return false;
                 }
+            }
+        }
+        
+        temp_visited.remove(&node);
+        visited.insert(node);
+        ordered.push(node);
+        true
+    }
+    
+    for &node in sequence {
+        if !visited.contains(&node) {
+            if !visit(node, graph, &mut visited, &mut temp_visited, &mut ordered) {
+                return None;
             }
         }
     }
     
-    // Perform topological sort
-    match toposort(&graph, None) {
-        Ok(indices) => Some(indices.into_iter()
-            .map(|idx| graph[idx])
-            .collect()),
-        Err(_) => None
+    Some(ordered)
+}
+
+fn build_dependency_graph(rules: &HashMap<i32, Vec<i32>>) -> HashMap<i32, HashSet<i32>> {
+    let mut graph: HashMap<i32, HashSet<i32>> = HashMap::with_capacity(rules.len());
+    
+    for (&from, to_list) in rules {
+        let entry = graph.entry(from).or_insert_with(|| HashSet::with_capacity(to_list.len()));
+        entry.extend(to_list.iter().copied());
+        
+        // Ensure all destination nodes have an entry in the graph
+        for &to in to_list {
+            graph.entry(to).or_insert_with(HashSet::new);
+        }
     }
+    
+    graph
 }
