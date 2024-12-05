@@ -2,9 +2,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 use std::collections::{HashMap, HashSet};
-use log::{info, warn};
-use petgraph::Graph;
-use petgraph::algo::toposort;
+use log::info;
 
 
 fn main() -> io::Result<()> {
