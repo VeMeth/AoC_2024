@@ -103,31 +103,39 @@ fn build_dependency_graph(rules: &HashMap<i32, Vec<i32>>) -> HashMap<i32, HashSe
 }
 
 fn attempt_reordering(rules: &HashMap<i32, Vec<i32>>, sequence: &[i32]) -> Option<Vec<i32>> {
-    let mut graph = Graph::<i32, ()>::new();
-    let mut node_indices = HashMap::new();
-    
-    // Create nodes
-    for &num in sequence {
-        let idx = graph.add_node(num);
-        node_indices.insert(num, idx);
-    }
-    
-    // Add edges
+    // Create dependency map for O(1) lookups
+    let mut dependencies: HashMap<i32, HashSet<i32>> = HashMap::new();
     for (&from, to_list) in rules {
-        if let Some(&from_idx) = node_indices.get(&from) {
-            for &to in to_list {
-                if let Some(&to_idx) = node_indices.get(&to) {
-                    graph.add_edge(from_idx, to_idx, ());
-                }
-            }
-        }
+        dependencies.entry(from)
+            .or_insert_with(HashSet::new)
+            .extend(to_list.iter().copied());
     }
     
-    // Perform topological sort
-    match toposort(&graph, None) {
-        Ok(indices) => Some(indices.into_iter()
-            .map(|idx| graph[idx])
-            .collect()),
-        Err(_) => None
-    }
+    // Create a mutable copy of the sequence
+    let mut ordered: Vec<i32> = sequence.to_vec();
+    
+    // Sort based on dependencies
+    ordered.sort_by(|&a, &b| {
+        let a_depends_on_b = dependencies
+            .get(&a)
+            .map_or(false, |deps| deps.contains(&b));
+            
+        let b_depends_on_a = dependencies
+            .get(&b)
+            .map_or(false, |deps| deps.contains(&a));
+            
+        if a_depends_on_b {
+            std::cmp::Ordering::Greater
+        } else if b_depends_on_a {
+            std::cmp::Ordering::Less
+        } else {
+            // Maintain original relative ordering for unrelated elements
+            sequence.iter()
+                .position(|&x| x == a)
+                .unwrap()
+                .cmp(&sequence.iter().position(|&x| x == b).unwrap())
+        }
+    });
+
+    Some(ordered)
 }
