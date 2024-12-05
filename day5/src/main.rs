@@ -129,11 +129,7 @@ fn attempt_reordering(rules: &HashMap<i32, Vec<i32>>, sequence: &[i32]) -> Optio
         } else if b_depends_on_a {
             std::cmp::Ordering::Less
         } else {
-            // Maintain original relative ordering for unrelated elements
-            sequence.iter()
-                .position(|&x| x == a)
-                .unwrap()
-                .cmp(&sequence.iter().position(|&x| x == b).unwrap())
+            return std::cmp::Ordering::Equal
         }
     });
 
