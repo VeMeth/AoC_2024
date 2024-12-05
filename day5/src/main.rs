@@ -78,28 +78,32 @@ fn check_sequence(rules: &HashSet<(i32,i32)>, sequence: &[i32]) -> bool {
 }
 
 fn attempt_reordering(rules: &HashSet<(i32, i32)>, sequence: &[i32]) -> Option<Vec<i32>> {
-    let mut graph = Graph::<i32, ()>::new();
-    let mut node_indices = HashMap::new();
+    let mut degrees: HashMap<i32, usize> = HashMap::new();
     
-    // Create nodes
+    // Initialize degrees for all numbers in sequence
     for &num in sequence {
-        let idx = graph.add_node(num);
-        node_indices.insert(num, idx);
+        degrees.insert(num, 0);
     }
-
-    for &from in sequence {
-        for &to in sequence {
-            if rules.contains(&(from, to)) {
-                graph.add_edge(*node_indices.get(&from)?, *node_indices.get(&to)?, ());
+    
+    // Calculate degrees based on rules
+    for &num in sequence {
+        for &other in sequence {
+            if rules.contains(&(num, other)) {
+                *degrees.entry(other).or_insert(0) += 1;
             }
         }
     }
     
-    // Perform topological sort
-    match toposort(&graph, None) {
-        Ok(indices) => Some(indices.into_iter()
-            .map(|idx| graph[idx])
-            .collect()),
-        Err(_) => None
+    // Find numbers with degree equal to sequence.len() / 2
+    let target_degree = sequence.len() / 2;
+    let matching_numbers: Vec<i32> = sequence.iter()
+        .filter(|&&num| degrees.get(&num).unwrap_or(&0) == &target_degree)
+        .cloned()
+        .collect();
+    
+    if matching_numbers.is_empty() {
+        None
+    } else {
+        Some(matching_numbers)
     }
 }
