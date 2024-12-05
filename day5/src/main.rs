@@ -52,7 +52,6 @@ fn process_sequences(rules: &HashSet<(i32, i32)>, updates: &[Vec<i32>]) {
                 valid_sum += middle;
             }
         } else {
-            //warn!("Invalid sequence {} with {} violations", line_index + 1, violations.len());
             
             if let Some(ordered) = attempt_reordering(rules, update) {
                 if let Some(&middle) = ordered.get(ordered.len() / 2) {
