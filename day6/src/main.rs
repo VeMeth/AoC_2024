@@ -1,19 +1,28 @@
 use std::fs::read_to_string;
 use std::error::Error;
+use std::collections::HashSet;
 
-struct Maze {
-    grid: Vec<Vec<char>>,
-    rows: usize,
-    cols: usize,
-    steps: usize,  // New field to track steps taken
+#[derive(Hash, Eq, PartialEq, Clone, Copy)]
+struct WallCollision {
+    position: (i32, i32),
+    direction: Direction,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Hash, Eq, PartialEq, Clone, Copy)]
 enum Direction {
     Up,
     Right,
     Down,
     Left,
+}
+
+struct Maze {
+    grid: Vec<Vec<char>>,
+    rows: usize,
+    cols: usize,
+    steps: usize,
+    wall_collisions: HashSet<WallCollision>,
+    has_loop: bool,
 }
 
 impl Direction {
@@ -51,8 +60,35 @@ impl Maze {
             grid, 
             rows, 
             cols,
-            steps: 0  // Initialize step counter
+            steps: 0,
+            wall_collisions: HashSet::new(),
+            has_loop: false,
         })
+    }
+
+    fn try_all_wall_positions(&mut self) -> (Vec<(usize, usize, usize, bool)>, usize) {
+        let mut results = Vec::new();
+        let original_grid = self.grid.clone();
+        let mut total_loops = 0;
+        
+        for row in 0..self.rows {
+            for col in 0..self.cols {
+                if original_grid[row][col] != '#' && original_grid[row][col] != '^' {
+                    self.grid[row][col] = '#';
+                    if let Ok((steps, has_loop)) = self.solve() {
+                        if has_loop {
+                            total_loops += 1;
+                            self.grid = original_grid.clone();
+                            continue;
+                        }
+                        results.push((row, col, steps, has_loop));
+                    }
+                    self.grid = original_grid.clone();
+                }
+            }
+        }
+        
+        (results, total_loops)
     }
 
     fn find_start(&self) -> Option<(usize, usize)> {
@@ -70,55 +106,61 @@ impl Maze {
         row >= 0 && row < self.rows as i32 && col >= 0 && col < self.cols as i32
     }
 
-    fn solve(&mut self) -> Result<usize, Box<dyn Error>> {  // Changed return type to include step count
+    fn solve(&mut self) -> Result<(usize, bool), Box<dyn Error>> {
         let start = self.find_start().ok_or("No start position (^) found")?;
         let mut current_pos = (start.0 as i32, start.1 as i32);
         let mut direction = Direction::Up;
 
-        // Mark the starting position
         self.grid[start.0][start.1] = 'X';
-        self.steps = 1;  // Count the starting position as first step
+        self.steps = 1;
+        self.wall_collisions.clear();
+        self.has_loop = false;
 
         loop {
             let (dx, dy) = direction.get_delta();
             let next_pos = (current_pos.0 + dx, current_pos.1 + dy);
 
-            // Check if we would leave the grid
             if !self.is_valid_position(next_pos.0, next_pos.1) {
                 break;
             }
 
-            // Check if we hit a wall
             if self.grid[next_pos.0 as usize][next_pos.1 as usize] == '#' {
-                // Rotate right and continue
+                let collision = WallCollision {
+                    position: next_pos,
+                    direction,
+                };
+                
+                if !self.wall_collisions.insert(collision) {
+                    self.has_loop = true;
+                    break;
+                }
+                
                 direction = direction.rotate_right();
                 continue;
             }
 
-            // Move to the next position and mark it
             if self.grid[next_pos.0 as usize][next_pos.1 as usize] != 'X' {
-                self.steps += 1;  // Only increment the counter if the current position isn't already an X
+                self.steps += 1;
             }
             current_pos = next_pos;
             self.grid[current_pos.0 as usize][current_pos.1 as usize] = 'X';
         }
 
-        Ok(self.steps)  // Return the total number of steps
+        Ok((self.steps, self.has_loop))
     }
 
-    fn display(&self) -> String {
-        self.grid
-            .iter()
-            .map(|row| row.iter().collect::<String>())
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
+    
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut maze = Maze::from_file("data/input.txt")?;  // Updated file path
-    let steps = maze.solve()?;
-    //println!("Solved maze:\n{}", maze.display());
-    println!("\nTotal steps taken: {}", steps);  // Display the step count
+    let mut original_maze = Maze::from_file("data/input.txt")?;
+    let (original_steps, _) = original_maze.solve()?;
+    println!("Original maze steps: {}", original_steps);
+
+    let mut maze = Maze::from_file("data/input.txt")?;
+    let (_results, total_loops) = maze.try_all_wall_positions();
+    
+    println!("Total configurations with loops: {}", total_loops);
+    
     Ok(())
 }
