@@ -66,31 +66,6 @@ impl Maze {
         })
     }
 
-    fn try_all_wall_positions(&mut self) -> (Vec<(usize, usize, usize, bool)>, usize) {
-        let mut results = Vec::new();
-        let original_grid = self.grid.clone();
-        let mut total_loops = 0;
-        
-        for row in 0..self.rows {
-            for col in 0..self.cols {
-                if original_grid[row][col] != '#' && original_grid[row][col] != '^' {
-                    self.grid[row][col] = '#';
-                    if let Ok((steps, has_loop)) = self.solve() {
-                        if has_loop {
-                            total_loops += 1;
-                            self.grid = original_grid.clone();
-                            continue;
-                        }
-                        results.push((row, col, steps, has_loop));
-                    }
-                    self.grid = original_grid.clone();
-                }
-            }
-        }
-        
-        (results, total_loops)
-    }
-
     fn find_start(&self) -> Option<(usize, usize)> {
         for (row, row_chars) in self.grid.iter().enumerate() {
             for (col, &ch) in row_chars.iter().enumerate() {
@@ -106,10 +81,11 @@ impl Maze {
         row >= 0 && row < self.rows as i32 && col >= 0 && col < self.cols as i32
     }
 
-    fn solve(&mut self) -> Result<(usize, bool), Box<dyn Error>> {
+    fn solve(&mut self) -> Result<(usize, bool, Vec<(i32, i32)>), Box<dyn Error>> {
         let start = self.find_start().ok_or("No start position (^) found")?;
         let mut current_pos = (start.0 as i32, start.1 as i32);
         let mut direction = Direction::Up;
+        let mut path = vec![current_pos];
 
         self.grid[start.0][start.1] = 'X';
         self.steps = 1;
@@ -143,24 +119,57 @@ impl Maze {
                 self.steps += 1;
             }
             current_pos = next_pos;
+            path.push(current_pos);
             self.grid[current_pos.0 as usize][current_pos.1 as usize] = 'X';
         }
 
-        Ok((self.steps, self.has_loop))
+        Ok((self.steps, self.has_loop, path))
     }
 
-    
+    fn try_all_wall_positions(&mut self) -> (Vec<(usize, usize, usize, bool)>, usize) {
+        let mut results = Vec::new();
+        let original_grid = self.grid.clone();
+        let mut total_loops = 0;
+        
+        // Get original path
+        let (_, _, original_path) = self.solve().unwrap();
+        self.grid = original_grid.clone();
+        
+        // Convert path to HashSet for O(1) lookups
+        let path_set: HashSet<_> = original_path.into_iter().collect();
+        
+        for row in 0..self.rows {
+            for col in 0..self.cols {
+                if original_grid[row][col] != '#' && 
+                   original_grid[row][col] != '^' && 
+                   path_set.contains(&(row as i32, col as i32)) {
+                    self.grid[row][col] = '#';
+                    if let Ok((steps, has_loop, _)) = self.solve() {
+                        if has_loop {
+                            total_loops += 1;
+                            self.grid = original_grid.clone();
+                            continue;
+                        }
+                        results.push((row, col, steps, has_loop));
+                    }
+                    self.grid = original_grid.clone();
+                }
+            }
+        }
+        
+        (results, total_loops)
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut original_maze = Maze::from_file("data/input.txt")?;
-    let (original_steps, _) = original_maze.solve()?;
+    let (original_steps, _, _) = original_maze.solve()?;
     println!("Original maze steps: {}", original_steps);
 
     let mut maze = Maze::from_file("data/input.txt")?;
     let (_results, total_loops) = maze.try_all_wall_positions();
     
-    println!("Total configurations with loops: {}", total_loops);
+    println!("\nTotal configurations with loops: {}", total_loops);
     
     Ok(())
 }
