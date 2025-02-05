@@ -13,9 +13,14 @@ fn evaluate(numbers: &[i64], operators: &[char]) -> i64 {
             '+' => result += numbers[i + 1],
             '*' => result *= numbers[i + 1],
             '|' => {
-                // Convert both numbers to strings, concatenate, then parse back to i64
-                let concat = format!("{}{}", result, numbers[i + 1]);
-                result = concat.parse().unwrap();
+                // Optimize concatenation by using arithmetic instead of string operations
+                let mut num2 = numbers[i + 1];
+                let mut multiplier = 1;
+                while num2 > 0 {
+                    multiplier *= 10;
+                    num2 /= 10;
+                }
+                result = result * multiplier + numbers[i + 1];
             }
             _ => panic!("Invalid operator"),
         }
@@ -33,13 +38,38 @@ fn can_make_value(eq: &Equation, include_concat: bool) -> bool {
     let n_slots = eq.numbers.len() - 1;
     let total_combinations = ops.len().pow(n_slots as u32);
     
+    // Early exit: check if concatenation alone works
+    if include_concat && n_slots == 1 {
+        let mut num = eq.numbers[0];
+        let mut multiplier = 1;
+        let mut temp = eq.numbers[1];
+        while temp > 0 {
+            multiplier *= 10;
+            temp /= 10;
+        }
+        if num * multiplier + eq.numbers[1] == eq.test_value {
+            return true;
+        }
+    }
+    
     // Try all possible combinations of operators
     for combo in 0..total_combinations {
-        let mut operators = Vec::new();
+        let mut operators = Vec::with_capacity(n_slots);
         let mut temp = combo;
         for _ in 0..n_slots {
             operators.push(ops[temp % ops.len()]);
             temp /= ops.len();
+        }
+        
+        // Early exit: skip if result would be too large
+        if operators.iter().any(|&op| op == '*') {
+            let mut product = 1;
+            for &num in &eq.numbers {
+                product *= num;
+                if product > eq.test_value {
+                    continue;
+                }
+            }
         }
         
         if evaluate(&eq.numbers, &operators) == eq.test_value {
