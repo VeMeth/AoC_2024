@@ -36,22 +36,57 @@ fn can_make_value(eq: &Equation, include_concat: bool) -> bool {
     };
     
     let n_slots = eq.numbers.len() - 1;
-    let total_combinations = ops.len().pow(n_slots as u32);
     
-    // Early exit: check if concatenation alone works
-    if include_concat && n_slots == 1 {
-        let mut num = eq.numbers[0];
-        let mut multiplier = 1;
-        let mut temp = eq.numbers[1];
-        while temp > 0 {
-            multiplier *= 10;
-            temp /= 10;
+    // Early exit: For single operator cases, check direct solutions first
+    if n_slots == 1 {
+        // Check concatenation
+        if include_concat {
+            let mut multiplier = 1;
+            let mut temp = eq.numbers[1];
+            while temp > 0 {
+                multiplier *= 10;
+                temp /= 10;
+            }
+            if eq.numbers[0] * multiplier + eq.numbers[1] == eq.test_value {
+                return true;
+            }
         }
-        if num * multiplier + eq.numbers[1] == eq.test_value {
+        
+        // Check addition
+        if eq.numbers[0] + eq.numbers[1] == eq.test_value {
             return true;
+        }
+        
+        // Check multiplication
+        if eq.numbers[0] * eq.numbers[1] == eq.test_value {
+            return true;
+        }
+        
+        // If none of the direct operations work for two numbers, return false
+        if n_slots == 1 {
+            return false;
         }
     }
     
+    let total_combinations = ops.len().pow(n_slots as u32);
+    
+    // Pre-calculate concatenation multipliers for each number
+    let mut concat_multipliers = if include_concat {
+        let mut multipliers = Vec::with_capacity(eq.numbers.len());
+        for &num in &eq.numbers {
+            let mut multiplier = 1;
+            let mut temp = num;
+            while temp > 0 {
+                multiplier *= 10;
+                temp /= 10;
+            }
+            multipliers.push(multiplier);
+        }
+        Some(multipliers)
+    } else {
+        None
+    };
+
     // Try all possible combinations of operators
     for combo in 0..total_combinations {
         let mut operators = Vec::with_capacity(n_slots);
@@ -61,15 +96,12 @@ fn can_make_value(eq: &Equation, include_concat: bool) -> bool {
             temp /= ops.len();
         }
         
-        // Early pruning checks
         let mut should_skip = false;
         let mut current_value = eq.test_value;
         
-        // Work backwards through the equation for early pruning
         for i in (0..n_slots).rev() {
             match operators[i] {
                 '*' => {
-                    // If not divisible by the next number, this combination is impossible
                     if current_value % eq.numbers[i + 1] != 0 {
                         should_skip = true;
                         break;
@@ -77,13 +109,7 @@ fn can_make_value(eq: &Equation, include_concat: bool) -> bool {
                     current_value /= eq.numbers[i + 1];
                 },
                 '|' => {
-                    // For concatenation, check if the target number ends with the right digits
-                    let mut divisor = 1;
-                    let mut temp = eq.numbers[i + 1];
-                    while temp > 0 {
-                        divisor *= 10;
-                        temp /= 10;
-                    }
+                    let divisor = concat_multipliers.as_ref().unwrap()[i + 1];
                     if current_value % divisor != eq.numbers[i + 1] {
                         should_skip = true;
                         break;
@@ -92,7 +118,6 @@ fn can_make_value(eq: &Equation, include_concat: bool) -> bool {
                 },
                 '+' => {
                     current_value -= eq.numbers[i + 1];
-                    // If we get a negative number, this combination is impossible
                     if current_value < 0 {
                         should_skip = true;
                         break;
@@ -102,7 +127,6 @@ fn can_make_value(eq: &Equation, include_concat: bool) -> bool {
             }
         }
         
-        // Final check: after processing all operators, we should have the first number
         if !should_skip && current_value == eq.numbers[0] {
             return true;
         }
