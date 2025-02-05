@@ -61,18 +61,49 @@ fn can_make_value(eq: &Equation, include_concat: bool) -> bool {
             temp /= ops.len();
         }
         
-        // Early exit: skip if result would be too large
-        if operators.iter().any(|&op| op == '*') {
-            let mut product = 1;
-            for &num in &eq.numbers {
-                product *= num;
-                if product > eq.test_value {
-                    continue;
-                }
+        // Early pruning checks
+        let mut should_skip = false;
+        let mut current_value = eq.test_value;
+        
+        // Work backwards through the equation for early pruning
+        for i in (0..n_slots).rev() {
+            match operators[i] {
+                '*' => {
+                    // If not divisible by the next number, this combination is impossible
+                    if current_value % eq.numbers[i + 1] != 0 {
+                        should_skip = true;
+                        break;
+                    }
+                    current_value /= eq.numbers[i + 1];
+                },
+                '|' => {
+                    // For concatenation, check if the target number ends with the right digits
+                    let mut divisor = 1;
+                    let mut temp = eq.numbers[i + 1];
+                    while temp > 0 {
+                        divisor *= 10;
+                        temp /= 10;
+                    }
+                    if current_value % divisor != eq.numbers[i + 1] {
+                        should_skip = true;
+                        break;
+                    }
+                    current_value /= divisor;
+                },
+                '+' => {
+                    current_value -= eq.numbers[i + 1];
+                    // If we get a negative number, this combination is impossible
+                    if current_value < 0 {
+                        should_skip = true;
+                        break;
+                    }
+                },
+                _ => panic!("Invalid operator"),
             }
         }
         
-        if evaluate(&eq.numbers, &operators) == eq.test_value {
+        // Final check: after processing all operators, we should have the first number
+        if !should_skip && current_value == eq.numbers[0] {
             return true;
         }
     }
