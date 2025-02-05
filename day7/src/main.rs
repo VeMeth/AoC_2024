@@ -64,7 +64,6 @@ fn can_make_value(eq: &Equation, include_concat: bool) -> bool {
         // Early pruning checks
         let mut should_skip = false;
         let mut current_value = eq.test_value;
-        let mut seen_values = std::collections::HashSet::new();
         
         // Work backwards through the equation for early pruning
         for i in (0..n_slots).rev() {
@@ -100,12 +99,6 @@ fn can_make_value(eq: &Equation, include_concat: bool) -> bool {
                     }
                 },
                 _ => panic!("Invalid operator"),
-            }
-            
-            // Skip if we've seen this intermediate value before
-            if !seen_values.insert(current_value) {
-                should_skip = true;
-                break;
             }
         }
         
